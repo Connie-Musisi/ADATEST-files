@@ -130,3 +130,33 @@ for(iscen in 1:nrow(eg)){
       fn2 <- file.path(file.path("./Sim_datasets/Dietswap", fn),sprintf("sim%d.Rdata",sim))
       save(midas.data, file = fn2)
     }}}
+
+#### Create phyloseq object ####
+create_phyloseq <- function(midas_data) {  
+  # otu table
+  midas_otutable <- midas_data[[2]]  # Extract the OTU table (counts)
+  rownames(midas_otutable) <- paste0("sample", 1:nrow(midas_otutable))  # Set row names for samples
+  
+  # taxa table
+  n.taxa <- ncol(midas_otutable)  # Number of taxa is the number of columns in the OTU table
+  midas_taxtable <- matrix(nrow = n.taxa, ncol = 2)  # Create a 2-column matrix for taxa info
+  midas_taxtable[, 1:2] <- c(midas_data[[1]], midas_data[[3]])  # First column: DA_ind, Second column: cens.prob
+  colnames(midas_taxtable) <- c("DA_ind", "cens.prob")  # Column names for the taxa table
+  midas_taxtable <- as.data.frame(midas_taxtable)  # Convert to data frame
+  midas_taxtable$isDA <- ifelse(midas_taxtable$DA_ind == 1, "TRUE", "FALSE")  # Add isDA column
+  rownames(midas_taxtable) <- colnames(midas_otutable)  # Set taxa (OTU) names as rownames for taxa table
+  midas_taxtable <- as.matrix(midas_taxtable)  # Convert to matrix (as required by phyloseq)
+  
+  # sample data
+  midas_samdata <- as.data.frame(midas_data[[4]])  # Extract sample data (x.index values)
+  rownames(midas_samdata) <- rownames(midas_otutable)  # Set row names for sample data (same as OTU table)
+  colnames(midas_samdata) <- "x.index"  # Column name for the variable of interest
+  midas_samdata$group <- ifelse(midas_samdata$x.index == 0.5, 1, 0)  # Create a 'group' column for the groupings
+  
+  # Create phyloseq object
+  midas_phyloseq <- phyloseq(otu_table(midas_otutable, taxa_are_rows = FALSE),
+                             sample_data(midas_samdata),
+                             tax_table(midas_taxtable))
+  
+  return(midas_phyloseq)  # Return the phyloseq object
+}
