@@ -127,29 +127,35 @@ for(iscen in 1:nrow(eg)){
   save(midas.data, file = fn2)
   }}}
 
-
-min.without.zero<-apply(ra.all,2,FUN=
-                          function(x) {
-                            if(length(x[x!=0])>0){min(x[x!=0])}
-                            else{0.00001}
-                          })
-
-hist(log2((apply(ra.all[1:100,],2,mean)+min.without.zero)/(apply(ra.all[101:200,],2,mean)+min.without.zero))[which(trueDA==1)], nclass = 20,main=paste0("Before trimming, median LFC = ",median(log2((apply(ra.all[1:100,],2,mean)+min.without.zero)/(apply(ra.all[101:200,],2,mean)+min.without.zero))[which(trueDA==1)],na.rm=TRUE)))
-hist(log2((apply(ra.all[1:100,],2,mean)+min.without.zero)/(apply(ra.all[101:200,],2,mean)+min.without.zero))[which(trueDA==0)], nclass = 20,main=paste0("Before trimming, median LFC = ",median(log2((apply(ra.all[1:100,],2,mean)+min.without.zero)/(apply(ra.all[101:200,],2,mean)+min.without.zero))[which(trueDA==0)],na.rm=TRUE)))
-
-
-
-
-lfc2<-log2(colMeans(tmp[(n1+1):n,])/colMeans(tmp[1:n1,]))
-lfc2_check = log2((apply(ra.all[101:200,],2,mean))/(apply(ra.all[1:100,],2,mean)))
-
-tmp<-tax_table(simdata_filter)
-hist(lfc2[as.data.frame(tmp)$isDA=="FALSE"], nclass = 20,main=paste0("Before trimming, median LFC = ",median(lfc2[as.data.frame(tmp)$isDA=="FALSE"],na.rm=TRUE)))
-hist(lfc2_check[which(trueDA==0)], nclass = 20,main=paste0("Before trimming, median LFC = ",median(lfc2_check[which(trueDA==0)],na.rm=TRUE)))
-hist(log2((apply(ra.all[101:200,],2,mean)+min.without.zero)/(apply(ra.all[1:100,],2,mean)+min.without.zero))[which(trueDA==0)], nclass = 20,main=paste0("Before trimming, median LFC = ",median(log2((apply(ra.all[101:200,],2,mean)+min.without.zero)/(apply(ra.all[1:100,],2,mean)+min.without.zero))[which(trueDA==0)],na.rm=TRUE)))
-hist(log2((apply(ra.all[101:200,],2,mean))/(apply(ra.all[1:100,],2,mean)))[which(trueDA==0)], nclass = 20,main=paste0("Before trimming, median LFC = ",median(log2((apply(ra.all[101:200,],2,mean))/(apply(ra.all[1:100,],2,mean)))[which(trueDA==0)],na.rm=TRUE)))
-
-tmp
-
-max(min.without.zero)
+#### Create phyloseq object ####
+create_phyloseq <- function(midas_data) {
+  # Extract necessary elements from midas_data (assumed format as given)
+  
+  # otu table
+  midas_otutable <- midas_data[[2]]  # Extract the OTU table (counts)
+  rownames(midas_otutable) <- paste0("sample", 1:nrow(midas_otutable))  # Set row names for samples
+  
+  # taxa table
+  n.taxa <- ncol(midas_otutable)  # Number of taxa is the number of columns in the OTU table
+  midas_taxtable <- matrix(nrow = n.taxa, ncol = 2)  # Create a 2-column matrix for taxa info
+  midas_taxtable[, 1:2] <- c(midas_data[[1]], midas_data[[3]])  # First column: DA_ind, Second column: cens.prob
+  colnames(midas_taxtable) <- c("DA_ind", "cens.prob")  # Column names for the taxa table
+  midas_taxtable <- as.data.frame(midas_taxtable)  # Convert to data frame
+  midas_taxtable$isDA <- ifelse(midas_taxtable$DA_ind == 1, "TRUE", "FALSE")  # Add isDA column
+  rownames(midas_taxtable) <- colnames(midas_otutable)  # Set taxa (OTU) names as rownames for taxa table
+  midas_taxtable <- as.matrix(midas_taxtable)  # Convert to matrix (as required by phyloseq)
+  
+  # sample data
+  midas_samdata <- as.data.frame(midas_data[[4]])  # Extract sample data (x.index values)
+  rownames(midas_samdata) <- rownames(midas_otutable)  # Set row names for sample data (same as OTU table)
+  colnames(midas_samdata) <- "x.index"  # Column name for the variable of interest
+  midas_samdata$group <- ifelse(midas_samdata$x.index == 0.5, 1, 0)  # Create a 'group' column for the groupings
+  
+  # Create phyloseq object
+  midas_phyloseq <- phyloseq(otu_table(midas_otutable, taxa_are_rows = FALSE),
+                             sample_data(midas_samdata),
+                             tax_table(midas_taxtable))
+  
+  return(midas_phyloseq)  # Return the phyloseq object
+}
 
